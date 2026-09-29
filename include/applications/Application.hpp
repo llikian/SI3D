@@ -37,10 +37,14 @@ private:
      */
     void draw();
 
+    void draw_imgui_main_window();
+
     /**
      * @brief Draws the imgui debug window.
      */
     void draw_imgui_windows();
+
+    void handle_dockspace() const;
 
     Camera camera; ///< The camera.
 

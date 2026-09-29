@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 Application::Application()
     : camera(vec3(0.0f, 10.0f, -5.0f), PI_HALF_F, 0.1f, 1024.0f),
@@ -59,53 +60,11 @@ Application::~Application() {
 }
 
 void Application::run() {
-    // scene_graph.add_gltf_scene_node("Buggy", 0, "data/models/buggy.glb");
-
-    unsigned int sponza = scene_graph.add_gltf_scene_node("Sponza", 0, "data/models/sponza/Sponza.gltf");
-    scene_graph.transforms[sponza].set_local_scale(10.0f);
-
     /* Main Loop */
     while(!Context::window().should_close()) {
         Context::event_handler().poll_and_handle_events();
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
-
-        frustum.update(camera);
-
-        // draw();
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::Begin("Main", nullptr, ImGuiWindowFlags_NoTitleBar);
-        ImGui::PopStyleVar(1);
-
-        ImVec2 avail = ImGui::GetContentRegionAvail();
-        avail.x = avail.x < 1.0f ? 1.0f : avail.x;
-        avail.y = avail.y < 1.0f ? 1.0f : avail.y;
-
-        ImVec2 mouse_pos = ImGui::GetMousePos();
-        ImVec2 window_pos = ImGui::GetWindowPos();
-        ImVec2 window_content_region = ImGui::GetWindowContentRegionMin();
-        Context::context()->is_main_window_hovered = ImGui::IsWindowHovered();
-        Context::context()->mouse_pos_in_main_window = vec2(mouse_pos.x - window_pos.x - window_content_region.x,
-                                                            mouse_pos.y - window_pos.y - window_content_region.y);
-
-        vec2 res = framebuffer.get_resolution();
-        if(static_cast<int>(avail.x) != res.x || static_cast<int>(avail.y) != res.y) {
-            framebuffer.resize(avail.x, avail.y);
-            glViewport(0, 0, avail.x, avail.y);
-            camera.update_projection_matrix(avail.x, avail.y);
-            Context::context()->framebuffer_resolution = vec2(avail.x, avail.y);
-        }
-
-        draw();
-
-        ImGui::Image(framebuffer.get_texture_id(), avail, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
-
-        ImGui::End();
-
+        draw_imgui_main_window();
         draw_imgui_windows();
 
         ImGui::Render();
@@ -151,8 +110,41 @@ void Application::draw() {
     // if(Context::event_handler().is_wireframe_enabled()) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
 }
 
-ImVec2 operator-(const ImVec2& left, const ImVec2& right) {
-    return ImVec2(left.x - right.x, left.y - right.y);
+void Application::draw_imgui_main_window() {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    frustum.update(camera);
+    handle_dockspace();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("Main", nullptr, ImGuiWindowFlags_NoTitleBar);
+    ImGui::PopStyleVar(1);
+
+    ImVec2 avail = ImGui::GetContentRegionAvail();
+    avail.x = avail.x < 1.0f ? 1.0f : avail.x;
+    avail.y = avail.y < 1.0f ? 1.0f : avail.y;
+
+    ImVec2 mouse_pos = ImGui::GetMousePos();
+    ImVec2 window_pos = ImGui::GetWindowPos();
+    ImVec2 window_content_region = ImGui::GetWindowContentRegionMin();
+    Context::context()->is_main_window_hovered = ImGui::IsWindowHovered();
+    Context::context()->mouse_pos_in_main_window = vec2(mouse_pos.x - window_pos.x - window_content_region.x,
+                                                        mouse_pos.y - window_pos.y - window_content_region.y);
+
+    vec2 res = framebuffer.get_resolution();
+    if(static_cast<int>(avail.x) != res.x || static_cast<int>(avail.y) != res.y) {
+        framebuffer.resize(avail.x, avail.y);
+        glViewport(0, 0, avail.x, avail.y);
+        camera.update_projection_matrix(avail.x, avail.y);
+        Context::context()->framebuffer_resolution = vec2(avail.x, avail.y);
+    }
+
+    draw();
+
+    ImGui::Image(framebuffer.get_texture_id(), avail, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+    ImGui::End();
 }
 
 void Application::draw_imgui_windows() {
@@ -195,4 +187,34 @@ void Application::draw_imgui_windows() {
     ImGui::Begin("Object Editor");
     scene_graph.add_object_editor_to_imgui_window();
     ImGui::End();
+}
+
+void Application::handle_dockspace() const {
+    static bool init_dock = !std::filesystem::exists("data/imgui.ini");
+    unsigned int dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+
+    if(init_dock) {
+        unsigned int dock_id_left =
+            ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2f, nullptr, &dockspace_id);
+        unsigned int dock_id_left_top =
+            ImGui::DockBuilderSplitNode(dock_id_left, ImGuiDir_Up, 0.1f, nullptr, &dock_id_left);
+        unsigned int dock_id_right =
+            ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.2f, nullptr, &dockspace_id);
+
+        ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+
+        ImGui::DockBuilderDockWindow("Main", dockspace_id);
+
+        ImGui::DockBuilderDockWindow("Scene", dock_id_left);
+        ImGui::DockBuilderDockWindow("Environment", dock_id_left);
+        ImGui::DockBuilderDockWindow("Camera", dock_id_left);
+
+        ImGui::DockBuilderDockWindow("Debug", dock_id_left_top);
+
+        ImGui::DockBuilderDockWindow("Object Editor", dock_id_right);
+
+        ImGui::DockBuilderFinish(dockspace_id);
+
+        init_dock = false;
+    }
 }
