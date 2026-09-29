@@ -191,7 +191,7 @@ void Application::draw_imgui_windows() {
 
 void Application::handle_dockspace() const {
     static bool init_dock = !std::filesystem::exists("data/imgui.ini");
-    unsigned int dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+    unsigned int dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr);
 
     if(init_dock) {
         unsigned int dock_id_left =
