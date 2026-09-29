@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iostream>
 
 template <typename Type>
